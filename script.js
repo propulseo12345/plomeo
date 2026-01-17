@@ -29,8 +29,34 @@ function initLoader() {
     const loader = document.getElementById('loader');
     if (!loader) return;
 
+    // Fonction pour cacher le loader
+    function hideLoader() {
+        loader.classList.add('hidden');
+        document.body.classList.remove('loading');
+    }
+
+    // Fonction pour révéler les éléments
+    function revealElements() {
+        document.querySelectorAll('[data-reveal]').forEach(el => {
+            el.classList.add('visible');
+        });
+    }
+
+    // Fallback: toujours cacher le loader après un délai maximum (sécurité)
+    const maxLoaderTime = 3000; // 3 secondes maximum
+    const fallbackTimeout = setTimeout(() => {
+        hideLoader();
+        revealElements();
+    }, maxLoaderTime);
+
     // Check navigation type
-    const navType = performance.getEntriesByType('navigation')[0]?.type;
+    let navType;
+    try {
+        navType = performance.getEntriesByType('navigation')[0]?.type;
+    } catch (e) {
+        navType = null;
+    }
+    
     const isBackNavigation = navType === 'back_forward';
     const isReload = navType === 'reload';
     const savedScrollPosition = sessionStorage.getItem('plomeo_scroll_position');
@@ -38,14 +64,12 @@ function initLoader() {
 
     // If returning from article modal, scroll to blog section
     if (isBackNavigation && wasViewingArticle) {
-        loader.classList.add('hidden');
-        document.body.classList.remove('loading');
+        clearTimeout(fallbackTimeout);
+        hideLoader();
         sessionStorage.removeItem('plomeo_viewing_article');
         
         setTimeout(() => {
-            document.querySelectorAll('[data-reveal]').forEach(el => {
-                el.classList.add('visible');
-            });
+            revealElements();
             
             const blogSection = document.getElementById('expertise');
             if (blogSection) {
@@ -65,13 +89,11 @@ function initLoader() {
 
     // If reload or back navigation with saved position, restore scroll
     if ((isReload || isBackNavigation) && savedScrollPosition) {
-        loader.classList.add('hidden');
-        document.body.classList.remove('loading');
+        clearTimeout(fallbackTimeout);
+        hideLoader();
         
         setTimeout(() => {
-            document.querySelectorAll('[data-reveal]').forEach(el => {
-                el.classList.add('visible');
-            });
+            revealElements();
             
             // Restore scroll position
             setTimeout(() => {
@@ -89,14 +111,15 @@ function initLoader() {
 
     // Simulate loading and hide
     setTimeout(() => {
-        loader.classList.add('hidden');
-        document.body.classList.remove('loading');
+        clearTimeout(fallbackTimeout);
+        hideLoader();
 
         // Trigger hero animations after loader
         setTimeout(() => {
             document.querySelectorAll('.hero [data-reveal]').forEach(el => {
                 el.classList.add('visible');
             });
+            revealElements();
         }, 200);
     }, 2000);
 }
