@@ -29,99 +29,101 @@ function initLoader() {
     const loader = document.getElementById('loader');
     if (!loader) return;
 
-    // Fonction pour cacher le loader
+    let loaderHidden = false;
+
+    // Fonction pour cacher le loader (sécurisée)
     function hideLoader() {
-        loader.classList.add('hidden');
-        document.body.classList.remove('loading');
+        if (loaderHidden) return;
+        loaderHidden = true;
+        
+        try {
+            loader.classList.add('hidden');
+            document.body.classList.remove('loading');
+            
+            // Révéler tous les éléments
+            document.querySelectorAll('[data-reveal]').forEach(el => {
+                el.classList.add('visible');
+            });
+        } catch (e) {
+            console.error('Error hiding loader:', e);
+            // Force hide en cas d'erreur
+            loader.style.display = 'none';
+            document.body.style.overflow = '';
+        }
     }
 
-    // Fonction pour révéler les éléments
-    function revealElements() {
-        document.querySelectorAll('[data-reveal]').forEach(el => {
-            el.classList.add('visible');
-        });
-    }
-
-    // Fallback: toujours cacher le loader après un délai maximum (sécurité)
-    const maxLoaderTime = 3000; // 3 secondes maximum
-    const fallbackTimeout = setTimeout(() => {
-        hideLoader();
-        revealElements();
-    }, maxLoaderTime);
-
-    // Check navigation type
-    let navType;
-    try {
-        navType = performance.getEntriesByType('navigation')[0]?.type;
-    } catch (e) {
-        navType = null;
+    // MULTIPLE FALLBACKS pour garantir que le loader se cache TOUJOURS
+    
+    // Fallback 1: Délai maximum absolu (1.5 secondes)
+    setTimeout(hideLoader, 1500);
+    
+    // Fallback 2: Quand la page est complètement chargée
+    if (document.readyState === 'complete') {
+        setTimeout(hideLoader, 500);
+    } else {
+        window.addEventListener('load', () => {
+            setTimeout(hideLoader, 300);
+        }, { once: true });
     }
     
-    const isBackNavigation = navType === 'back_forward';
-    const isReload = navType === 'reload';
-    const savedScrollPosition = sessionStorage.getItem('plomeo_scroll_position');
-    const wasViewingArticle = sessionStorage.getItem('plomeo_viewing_article') === 'true';
-
-    // If returning from article modal, scroll to blog section
-    if (isBackNavigation && wasViewingArticle) {
-        clearTimeout(fallbackTimeout);
-        hideLoader();
-        sessionStorage.removeItem('plomeo_viewing_article');
-        
-        setTimeout(() => {
-            revealElements();
-            
-            const blogSection = document.getElementById('expertise');
-            if (blogSection) {
-                setTimeout(() => {
-                    const headerOffset = 80;
-                    const elementPosition = blogSection.getBoundingClientRect().top;
-                    const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
-                    window.scrollTo({
-                        top: offsetPosition,
-                        behavior: 'smooth'
-                    });
-                }, 100);
-            }
-        }, 100);
-        return;
+    // Fallback 3: Dès que DOM est prêt
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(hideLoader, 1200);
+        }, { once: true });
+    } else {
+        setTimeout(hideLoader, 1200);
     }
 
-    // If reload or back navigation with saved position, restore scroll
-    if ((isReload || isBackNavigation) && savedScrollPosition) {
-        clearTimeout(fallbackTimeout);
-        hideLoader();
-        
-        setTimeout(() => {
-            revealElements();
+    // Check navigation type (optionnel, ne bloque plus)
+    try {
+        const navType = performance.getEntriesByType('navigation')[0]?.type;
+        const isBackNavigation = navType === 'back_forward';
+        const isReload = navType === 'reload';
+        const savedScrollPosition = sessionStorage.getItem('plomeo_scroll_position');
+        const wasViewingArticle = sessionStorage.getItem('plomeo_viewing_article') === 'true';
+
+        // Si navigation arrière depuis article, scroll vers blog
+        if (isBackNavigation && wasViewingArticle) {
+            hideLoader();
+            sessionStorage.removeItem('plomeo_viewing_article');
             
-            // Restore scroll position
+            setTimeout(() => {
+                const blogSection = document.getElementById('expertise');
+                if (blogSection) {
+                    setTimeout(() => {
+                        const headerOffset = 80;
+                        const elementPosition = blogSection.getBoundingClientRect().top;
+                        const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+                        window.scrollTo({
+                            top: offsetPosition,
+                            behavior: 'smooth'
+                        });
+                    }, 100);
+                }
+            }, 100);
+            return;
+        }
+
+        // Si reload avec position sauvegardée
+        if ((isReload || isBackNavigation) && savedScrollPosition) {
+            hideLoader();
+            
             setTimeout(() => {
                 window.scrollTo({
                     top: parseInt(savedScrollPosition, 10),
                     behavior: 'auto'
                 });
             }, 100);
-        }, 100);
-        return;
+            return;
+        }
+    } catch (e) {
+        // Ignore les erreurs de navigation, le fallback s'occupera du reste
+        console.warn('Navigation detection failed, using fallback:', e);
     }
 
     // First visit: show loader
     document.body.classList.add('loading');
-
-    // Simulate loading and hide
-    setTimeout(() => {
-        clearTimeout(fallbackTimeout);
-        hideLoader();
-
-        // Trigger hero animations after loader
-        setTimeout(() => {
-            document.querySelectorAll('.hero [data-reveal]').forEach(el => {
-                el.classList.add('visible');
-            });
-            revealElements();
-        }, 200);
-    }, 2000);
 }
 
 // Save scroll position before page unload
